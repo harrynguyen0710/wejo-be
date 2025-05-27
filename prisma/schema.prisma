@@ -1,0 +1,171 @@
+generator client {
+  provider        = "prisma-client-js"
+  output          = "../src/generated/prisma"
+  previewFeatures = ["multiSchema"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  schemas  = ["game", "identity", "sport", "venue"]
+}
+
+model Game {
+  Id               String                   @id @default(dbgenerated("public.uuid_generate_v4()")) @db.Uuid
+  SportId          Int
+  CreatedBy        String
+  SportFormatId    Int?
+  VenueId          String?                  @db.Uuid
+  GameTypeId       Int?
+  Area             String                   @db.VarChar(255)
+  StartTime        DateTime                 @db.Timestamp(6)
+  EndTime          DateTime                 @db.Timestamp(6)
+  CreatedAt        DateTime?                @default(now()) @db.Timestamp(0)
+  GameAccess       Boolean                  @default(true)
+  BringEquipment   Boolean                  @default(false)
+  CostShared       Boolean                  @default(false)
+  GameSkill        Boolean                  @default(false)
+  SkillStart       Int?
+  SkillEnd         Int?
+  TotalPlayer      Int?
+  Status           Int                      @default(0)
+  Description      String?
+  Location         Unsupported("geometry")?
+  GameType         GameType?                @relation(fields: [GameTypeId], references: [Id], onDelete: NoAction, onUpdate: NoAction)
+  SportFormat      SportFormat?             @relation(fields: [SportFormatId], references: [Id], onDelete: NoAction, onUpdate: NoAction)
+  Sport            Sport                    @relation(fields: [SportId], references: [Id], onDelete: Cascade, onUpdate: NoAction)
+  Venue            Venue?                   @relation(fields: [VenueId], references: [Id], onDelete: NoAction, onUpdate: NoAction)
+  GameParticipants GameParticipants[]
+  UserPlaypal      UserPlaypal[]
+
+  @@index([GameTypeId], map: "IX_Game_GameTypeId")
+  @@index([SportFormatId], map: "IX_Game_SportFormatId")
+  @@index([SportId], map: "IX_Game_SportId")
+  @@index([VenueId], map: "IX_Game_VenueId")
+  @@schema("game")
+}
+
+model GameParticipants {
+  Id                 String               @id @db.Uuid
+  UserId             String
+  GameId             String               @db.Uuid
+  Status             Int
+  JoinedAt           DateTime             @db.Timestamp(0)
+  LeftAt             DateTime?            @db.Timestamp(0)
+  ModifiedOn         DateTime?            @db.Timestamp(0)
+  CreatedOn          DateTime?            @db.Timestamp(0)
+  Game               Game                 @relation(fields: [GameId], references: [Id], onDelete: NoAction, onUpdate: NoAction, map: "pk_gameid")
+  User               User                 @relation(fields: [UserId], references: [Id], onDelete: NoAction, onUpdate: NoAction, map: "pk_userid")
+  ParticipantHistory ParticipantHistory[]
+
+  @@index([GameId], map: "IX_GameParticipants_GameId")
+  @@index([UserId], map: "IX_GameParticipants_UserId")
+  @@schema("game")
+}
+
+model GameType {
+  Id       Int    @id @default(autoincrement())
+  NameType String @db.VarChar(255)
+  Game     Game[]
+
+  @@schema("game")
+}
+
+model ParticipantHistory {
+  Id               String           @id @db.Uuid
+  Action           Int?
+  TimeStamp        DateTime?        @db.Date
+  Details          String?          @db.VarChar(255)
+  ParticipantId    String           @db.Uuid
+  GameParticipants GameParticipants @relation(fields: [ParticipantId], references: [Id], onDelete: NoAction, onUpdate: NoAction, map: "pk_participantid")
+
+  @@index([ParticipantId], map: "IX_ParticipantHistory_ParticipantId")
+  @@schema("game")
+}
+
+model User {
+  Id                                    String             @id(map: "Users_pkey")
+  FirstName                             String?
+  LastName                              String?
+  DateOfBirth                           DateTime?          @db.Date
+  Gender                                Int?
+  Bio                                   String?
+  Level                                 Int?
+  Avatar                                String?
+  ActivedDate                           DateTime?          @db.Timestamptz(6)
+  LastLoginDate                         DateTime?          @db.Timestamptz(6)
+  CreatedOn                             DateTime?          @db.Timestamptz(6)
+  ModifiedBy                            String?
+  ModifiedOn                            DateTime?          @db.Timestamptz(6)
+  IsDelete                              Boolean?
+  Email                                 String?
+  PhoneNumber                           String?
+  PhoneNumberConfirmed                  Boolean?
+  EmailConfirmed                        Boolean?
+  Password                              String?            
+
+  GameParticipants                      GameParticipants[]
+  UserLocation                          UserLocation[]
+  UserPlaypal_UserPlaypal_UserId1ToUser UserPlaypal[]      @relation("UserPlaypal_UserId1ToUser")
+  UserPlaypal_UserPlaypal_UserId2ToUser UserPlaypal[]      @relation("UserPlaypal_UserId2ToUser")
+
+  @@schema("identity")
+}
+
+model UserLocation {
+  Id        String    @id @db.Uuid
+  UserId    String
+  Latitude  Decimal?  @db.Decimal(10, 6)
+  Longitude Decimal?  @db.Decimal(10, 6)
+  Adddress  String?
+  UpdatedAt DateTime? @db.Time(6)
+  User      User      @relation(fields: [UserId], references: [Id], onDelete: NoAction, onUpdate: NoAction, map: "fk_userId")
+
+  @@index([UserId], map: "IX_UserLocation_UserId")
+  @@schema("identity")
+}
+
+model UserPlaypal {
+  Id                             String    @id @db.Uuid
+  UserId1                        String?   @db.VarChar(28)
+  UserId2                        String?   @db.VarChar(28)
+  GameId                         String?   @db.Uuid
+  CreatedOn                      DateTime? @db.Timestamp(6)
+  Game                           Game?     @relation(fields: [GameId], references: [Id], onDelete: NoAction, onUpdate: NoAction, map: "FK_Playpals_GameId")
+  User_UserPlaypal_UserId1ToUser User?     @relation("UserPlaypal_UserId1ToUser", fields: [UserId1], references: [Id], onDelete: NoAction, onUpdate: NoAction, map: "FK_Playpals_UserId1")
+  User_UserPlaypal_UserId2ToUser User?     @relation("UserPlaypal_UserId2ToUser", fields: [UserId2], references: [Id], onDelete: NoAction, onUpdate: NoAction, map: "FK_Playpals_UserId2")
+
+  @@unique([UserId1, UserId2], map: "uq_playpals_users")
+  @@index([GameId], map: "IX_UserPlaypal_GameId")
+  @@index([UserId2], map: "IX_UserPlaypal_UserId2")
+  @@schema("identity")
+}
+
+model Sport {
+  Id          Int           @id @default(autoincrement())
+  Name        String        @unique @db.VarChar(255)
+  Game        Game[]
+  SportFormat SportFormat[]
+
+  @@schema("sport")
+}
+
+model SportFormat {
+  Id         Int    @id(map: "GameFormat_pkey") @default(autoincrement())
+  SportId    Int
+  FormatName String @db.VarChar(100)
+  Game       Game[]
+  Sport      Sport  @relation(fields: [SportId], references: [Id], onDelete: Cascade, onUpdate: NoAction, map: "GameFormat_SportId_fkey")
+
+  @@unique([SportId, FormatName], map: "GameFormat_SportId_FormatName_key")
+  @@schema("sport")
+}
+
+model Venue {
+  Id      String  @id @default(dbgenerated("public.uuid_generate_v4()")) @db.Uuid
+  Name    String  @db.VarChar(255)
+  Address String?
+  Game    Game[]
+
+  @@schema("venue")
+}
